@@ -1,0 +1,6 @@
+(load "stdext.scm")
+(load "engine.scm")
+(load "coordinates.scm")
+(load "graphics.scm")
+(load "editor.scm")
+(println "Loaded standard library!")
