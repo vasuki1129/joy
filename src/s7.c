@@ -1038,6 +1038,9 @@ typedef struct s7_cell {
       uint32_t ctr;                /* how many times has symbol been bound */
       uint32_t small_symbol_tag;   /* symbol as member of a (small) set (tree-set-memq etc), assumed to be uint32_t in clear_small_symbol_set */
     } sym;
+    /* ctr really only has 3 values, 0=declared but no associated value, 1=has first value, >1=given various values
+     *   and it's possible to free this field by using 2 bits in the type field (T_Location and T_High_Has_Let_File), but it's slightly slower using bits
+     */
 
     struct {                       /* syntax */
       s7_pointer symbol;
@@ -7614,17 +7617,17 @@ static void mark_owlet(s7_scheme *sc)
       }}
 #endif
   /* sc->error_type and friends are slots in owlet */
-  mark_slot(sc->error_type);
+  gc_mark(slot_value(sc->error_type));
   slot_set_value(sc->error_data, sc->F); /* or maybe mark_tree(slot_value(sc->error_data)) ? */
-  mark_slot(sc->error_data);
-  mark_slot(sc->error_code);
-  mark_slot(sc->error_line);
-  mark_slot(sc->error_file);
-  mark_slot(sc->error_position);
+  gc_mark(slot_value(sc->error_data));
+  gc_mark(slot_value(sc->error_code));
+  gc_mark(slot_value(sc->error_line));
+  gc_mark(slot_value(sc->error_file));
+  gc_mark(slot_value(sc->error_position));
 #if With_History
-  mark_slot(sc->error_history);
+  gc_mark(slot_value(sc->error_history));
 #endif
-  set_mark(sc->owlet);
+  /* set_mark(sc->owlet); */
   mark_let(let_outlet(sc->owlet));
 }
 
@@ -8102,7 +8105,7 @@ static s7_int gc(s7_scheme *sc)
   /* free up all unmarked objects */
   old_free_heap_top = sc->free_heap_top;
   {
-    s7_pointer *fp = sc->free_heap_top;
+    s7_pointer *fp = sc->free_heap_top; /* why does callgrind say this is very expensive? */
     s7_pointer *tp = sc->heap;
     s7_pointer *heap_top = (s7_pointer *)(sc->heap + sc->heap_size);
 
@@ -9903,21 +9906,23 @@ static s7_pointer update_let_with_four_slots(s7_scheme *sc, s7_pointer let, s7_p
 
 static s7_pointer make_semipermanent_let(s7_scheme *sc, s7_pointer vars)
 {
-  s7_pointer slot;
+  s7_pointer slot, symbol;
   const s7_pointer let = alloc_pointer(sc);
   set_full_type(let, T_LET | T_Safe_Procedure | T_Unheap);
   let_set_id(let, ++sc->let_number);
   let_set_outlet(let, sc->curlet);
-  slot = make_semipermanent_slot(sc, caar(vars), sc->F);
+  symbol = is_pair(car(vars)) ? caar(vars) : car(vars);
+  slot = make_semipermanent_slot(sc, symbol, sc->F);
   add_semipermanent_let_or_slot(sc, slot);
-  symbol_set_local_slot(caar(vars), sc->let_number, slot);
+  symbol_set_local_slot(symbol, sc->let_number, slot);
   let_set_slots(let, slot);
   for (s7_pointer var = cdr(vars); is_pair(var); var = cdr(var))
     {
       s7_pointer last_slot = slot;
-      slot = make_semipermanent_slot(sc, caar(var), sc->F);
+      symbol = is_pair(car(var)) ? caar(var) : car(var);
+      slot = make_semipermanent_slot(sc, symbol, sc->F);
       add_semipermanent_let_or_slot(sc, slot);
-      symbol_set_local_slot(caar(var), sc->let_number, slot);
+      symbol_set_local_slot(symbol, sc->let_number, slot);
       slot_set_next(last_slot, slot);
     }
   slot_set_next(slot, Slot_End);
@@ -10054,7 +10059,7 @@ static void remove_function_from_heap(s7_scheme *sc, s7_pointer value)
 	  }}}
 }
 
-static void add_slot_to_rootlet(s7_scheme *sc, s7_pointer slot)
+static void add_to_rootlet(s7_scheme *sc, s7_pointer slot)
 {
   set_in_rootlet(slot);
   slot_set_next(slot, sc->rootlet_slots);
@@ -10092,28 +10097,21 @@ s7_pointer s7_make_slot(s7_scheme *sc, s7_pointer let, s7_pointer symbol, s7_poi
 	}
 
       slot = make_semipermanent_slot(sc, symbol, value);
-      add_slot_to_rootlet(sc, slot);
+      add_to_rootlet(sc, slot);
       set_global_slot(symbol, slot);
       if (is_global(symbol))                  /* never defined locally (symbol_id tracks let_id) */
 	{
 	  if ((!is_gensym(symbol)) &&
 	      (!initial_value_is_defined(sc, symbol)) &&
 	      (!in_heap(value)) &&         /* else initial_value can be GC'd if symbol set! (initial != global, initial unprotected) */
-	       ((!sc->string_signature) || /* from init_signatures -- maybe need a boolean for this */
-	       (is_c_function(value))))    /* || (is_syntax(value)) -- we need 'else as a special case? */
-	    /* the string_signature business means only the initial rootlet c_functions take part in unlet.  It would be neat if any
-	     *   cload library's c_functions could be there as well, but then (unlet) needs to know which lets are in the chain.
-	     *   The current shadow_rootlet could be saved in each initial_value, these could be marked in some way, then the chain
-	     *   searched in (unlet) to get the currently active lets -- maybe too complex?  We could also provide a way to overrule
-	     *   the string_signature check, but then symbol collisions would probably be resolved as the last loaded (which might not
-	     *   be in the active chain).
-	     * Also, the c_function check is overly paranoid -- all we need is that the value is semipermanent (T_Unheap?).
-	     * But I don't see any interesting omissions.
-	     */
+	      ((!sc->string_signature) || /* from init_signatures -- why is this here? */
+	       (is_c_function(value))))   /* || (is_syntax(value)) -- we need 'else as a special case? */
+	    /* the c_function check is overly paranoid -- all we need is that the value is semipermanent (T_Unheap?) */
 	    {
 	      set_initial_value(symbol, value);
-	      if ((!sc->string_signature) && ((is_c_function(value)) || (is_syntax(value)))) /* syntax probably can't happen here (handled explicitly in syntax procedure) */
+	      if (/* (!sc->string_signature) && */ (is_c_function(value))) /* syntax can't happen here (it's handled explicitly in syntax procedure) */
 		add_to_unlet(sc, symbol);
+	      /* else fprintf(stderr, "%s unlet: %s\n", display(symbol), display(value)); */
 	    }
 	  set_local_slot(symbol, slot);
 	}
@@ -11812,7 +11810,7 @@ static s7_pointer make_macro(s7_scheme *sc, opcode_t op, bool named)
 	    immutable_object_error_nr(sc, set_elist_3(sc, wrap_string(sc, "can't ~S ~S; it is immutable", 28), cur_op_to_caller(sc, op), mac_name));
 
 	  if ((sc->curlet == sc->nil) && (!in_rootlet(mac_slot)))
-	    add_slot_to_rootlet(sc, mac_slot);
+	    add_to_rootlet(sc, mac_slot);
 	  slot_set_value_with_hook(mac_slot, mac);
 	}
       else s7_make_slot(sc, sc->curlet, mac_name, mac); /* was current but we've checked immutable already */
@@ -45177,14 +45175,6 @@ static int32_t opt_bool_sort(const void *v1, const void *v2, void *arg)
   return((sc->sort_fb(sc->sort_o)) ? -1 : 1);
 }
 
-static int32_t opt_bool_sort_0(const void *v1, const void *v2, void *arg)
-{
-  s7_scheme *sc = (s7_scheme *)arg;
-  slot_set_value(sc->sort_v1, (*(const s7_pointer *)v1)); /* first slot in curlet */
-  slot_set_value(sc->sort_v2, (*(const s7_pointer *)v2)); /* second slot in curlet */
-  return((sc->sort_fb(sc->sort_o)) ? -1 : 1);
-}
-
 static int32_t opt_bool_sort_p(const void *v1, const void *v2, void *arg)
 {
   s7_scheme *sc = (s7_scheme *)arg;
@@ -45390,7 +45380,7 @@ static s7_pointer g_sort(s7_scheme *sc, s7_pointer args)
 				{
 				  sc->sort_o = sc->opts[0];
 				  sc->sort_fb = q_call(sc->sort_o).fb;
-				  sort_func = (sc->pc == 1) ? opt_bool_sort_0 : opt_bool_sort;
+				  sort_func = opt_bool_sort;
 				}}
 			  else set_no_bool_opt(lessp_body);
 			}}
@@ -49450,7 +49440,7 @@ static s7_pointer g_arity(s7_scheme *sc, s7_pointer args) /* arity-uncopied coul
 {
   #define H_arity "(arity obj) the min and max number of args that obj can be applied to.  Returns #f if the object is not applicable."
   #define Q_arity s7_make_signature(sc, 2, s7_make_signature(sc, 2, sc->is_pair_symbol, sc->not_symbol), sc->T)
-  /* if_method_exists_return_value(sc, p, sc->arity_symbol, args); */
+  if_method_exists_return_value(sc, car(args), sc->arity_symbol, args);
   return(s7_arity(sc, car(args)));
 }
 
@@ -50348,37 +50338,28 @@ static bool hash_table_equal_1(s7_scheme *sc, s7_pointer x, s7_pointer y, shared
 static bool hash_table_equal(s7_scheme *sc, s7_pointer x, s7_pointer y, shared_info_t *ci)      {return(hash_table_equal_1(sc, x, y, ci, false));}
 static bool hash_table_equivalent(s7_scheme *sc, s7_pointer x, s7_pointer y, shared_info_t *ci) {return(hash_table_equal_1(sc, x, y, ci, true));}
 
-static bool slots_match(s7_scheme *sc, s7_pointer x_slot, s7_pointer y_let, shared_info_t *nci)
+static bool slots_match(s7_scheme *sc, s7_pointer x_slot, s7_pointer y_let, bool use_equal, shared_info_t *nci)
 {
   for (s7_pointer e = y_let; e; e = let_outlet(e))
     for (s7_pointer y_slot = let_slots(e); is_slot_checked(y_slot); y_slot = next_slot(y_slot))
       if (slot_symbol(x_slot) == slot_symbol(y_slot)) /* we know something will match */
-	return(is_equal_1(sc, slot_value(x_slot), slot_value(y_slot), nci));
+	{
+	  if (use_equal)
+	    return(is_equal_1(sc, slot_value(x_slot), slot_value(y_slot), nci));
+	  return(is_equivalent_1(sc, slot_value(x_slot), slot_value(y_slot), nci));
+	}
   return(false);
 }
 
-static bool slots_equivalent_match(s7_scheme *sc, s7_pointer x_slot, s7_pointer y_let, shared_info_t *nci)
+static bool simple_slots_match(s7_scheme *sc, s7_pointer x_slot, s7_pointer y_let, bool use_equal, shared_info_t *nci)
 {
-  for (s7_pointer e = y_let; e; e = let_outlet(e))
-    for (s7_pointer y_slot = let_slots(e); is_slot_checked(y_slot); y_slot = next_slot(y_slot))
-      if (slot_symbol(x_slot) == slot_symbol(y_slot)) /* we know something will match */
+  for (s7_pointer y_slot = let_slots(y_let); is_slot_checked(y_slot); y_slot = next_slot(y_slot))
+    if (slot_symbol(x_slot) == slot_symbol(y_slot)) /* we know something will match */
+      {
+	if (use_equal)
+	  return(is_equal_1(sc, slot_value(x_slot), slot_value(y_slot), nci));
 	return(is_equivalent_1(sc, slot_value(x_slot), slot_value(y_slot), nci));
-  return(false);
-}
-
-static bool simple_slots_match(s7_scheme *sc, s7_pointer x_slot, s7_pointer y_let, shared_info_t *nci)
-{
-  for (s7_pointer y_slot = let_slots(y_let); is_slot_checked(y_slot); y_slot = next_slot(y_slot))
-    if (slot_symbol(x_slot) == slot_symbol(y_slot)) /* we know something will match */
-      return(is_equal_1(sc, slot_value(x_slot), slot_value(y_slot), nci));
-  return(false);
-}
-
-static bool simple_slots_equivalent_match(s7_scheme *sc, s7_pointer x_slot, s7_pointer y_let, shared_info_t *nci)
-{
-  for (s7_pointer y_slot = let_slots(y_let); is_slot_checked(y_slot); y_slot = next_slot(y_slot))
-    if (slot_symbol(x_slot) == slot_symbol(y_slot)) /* we know something will match */
-      return(is_equivalent_1(sc, slot_value(x_slot), slot_value(y_slot), nci));
+      }
   return(false);
 }
 
@@ -50419,9 +50400,8 @@ static bool let_equal_1(s7_scheme *sc, s7_pointer x_let, s7_pointer y_let, share
 	for (s7_pointer slot = let_slots(x_let); is_slot_checked(slot); slot = next_slot(slot))
 	  if (small_symbol_tag(slot_symbol(slot)) == 0)                       /* unshadowed */
 	    {
-	      set_small_symbol_tag(slot_symbol(slot), sc->small_symbol_tag);  /* values don't match */
-	      if (((!equivalent) && (!simple_slots_match(sc, slot, y_let, nci))) ||
-		  ((equivalent) && (!simple_slots_equivalent_match(sc, slot, y_let, nci))))
+	      set_small_symbol_tag(slot_symbol(slot), sc->small_symbol_tag); /* so we don't see shadowed values(?) */
+	      if (!simple_slots_match(sc, slot, y_let, !equivalent, nci))
 		return(false);
 	    }}
       return(true);
@@ -50459,9 +50439,8 @@ static bool let_equal_1(s7_scheme *sc, s7_pointer x_let, s7_pointer y_let, share
       for (s7_pointer slot = let_slots(e); is_slot_checked(slot); slot = next_slot(slot))
 	if (small_symbol_tag(slot_symbol(slot)) == 0)                       /* unshadowed */
 	  {
-	    set_small_symbol_tag(slot_symbol(slot), sc->small_symbol_tag);  /* values don't match */
-	    if (((!equivalent) && (!slots_match(sc, slot, y_let, nci))) ||
-		((equivalent) && (!slots_equivalent_match(sc, slot, y_let, nci))))
+	    set_small_symbol_tag(slot_symbol(slot), sc->small_symbol_tag);
+	    if (!slots_match(sc, slot, y_let, !equivalent, nci))
 	      return(false);
 	  }}
   return(true);
@@ -50471,15 +50450,7 @@ static bool let_equal(s7_scheme *sc, s7_pointer x_let, s7_pointer y_let, shared_
 {
   /* x_let == y_let if all unshadowed vars match, leaving aside the rootlet, so that for any local variable, we get the same value in either x_let or y_let */
   if (x_let == y_let) return(true);
-#if 1
   check_equal_method(sc, x_let, y_let);
-#else
-  if (!is_global(sc->is_equal_symbol)) /* !has_active_methods here (twice) is slower, but this is also slow */
-    {
-      check_equal_method(sc, x_let, y_let);
-      check_equal_method(sc, y_let, x_let);
-    }
-#endif
   return(let_equal_1(sc, x_let, y_let, ci, false));
 }
 
@@ -50487,15 +50458,7 @@ static bool let_equal(s7_scheme *sc, s7_pointer x_let, s7_pointer y_let, shared_
 static bool let_equivalent(s7_scheme *sc, s7_pointer x_let, s7_pointer y_let, shared_info_t *ci)
 {
   if (x_let == y_let) return(true);
-#if 1
   check_equivalent_method(sc, x_let, y_let);
-#else
-  if (!is_global(sc->is_equivalent_symbol))
-    {
-      check_equivalent_method(sc, x_let, y_let);
-      check_equivalent_method(sc, y_let, x_let);
-    }
-#endif
   return(let_equal_1(sc, x_let, y_let, ci, true));
 }
 
@@ -54786,21 +54749,36 @@ static void op_c_catch_all_a(s7_scheme *sc)
 
 static s7_pointer init_owlet(s7_scheme *sc)
 {
-  s7_pointer p; /* watch out for order below */
-  const s7_pointer let = make_let(sc, sc->rootlet);
-  begin_temp(sc->x, let);
-  sc->error_type = add_slot_checked_with_id(sc, let, make_symbol(sc, "error-type", 10), sc->F);    /* the error type or tag ('division-by-zero) */
-  sc->error_data = add_slot_unchecked_with_id(sc, let, make_symbol(sc, "error-data", 10), sc->F);  /* the message or information passed by the error function */
-  sc->error_code = add_slot_unchecked_with_id(sc, let, make_symbol(sc, "error-code", 10), sc->F);  /* the code that s7 thinks triggered the error */
-  sc->error_line = add_slot_unchecked_with_id(sc, let, make_symbol(sc, "error-line", 10), p = make_permanent_integer(0));  /* the line number of that code */
-  add_saved_pointer(sc, p);
-  sc->error_file = add_slot_unchecked_with_id(sc, let, make_symbol(sc, "error-file", 10), sc->F);  /* the file name of that code */
-  sc->error_position = add_slot_unchecked_with_id(sc, let, make_symbol(sc, "error-position", 14), p = make_permanent_integer(0)); /* file-byte position of that code */
-  add_saved_pointer(sc, p);
+  s7_pointer p = set_elist_7(sc, 
+			     make_symbol(sc, "error-type", 10),
+			     make_symbol(sc, "error-data", 10),
+			     make_symbol(sc, "error-code", 10),
+			     make_symbol(sc, "error-line", 10),
+			     make_symbol(sc, "error-file", 10),
+			     make_symbol(sc, "error-position", 14),
+			     make_symbol(sc, "error-history", 13));
+  const s7_pointer let = make_semipermanent_let(sc, p); /* all values are sc->F */
+  s7_pointer slot = let_slots(let);
+  sc->error_type = slot;     /* the error type or tag ('division-by-zero) */
+  slot = next_slot(slot);
+  sc->error_data = slot;     /* the message or information passed by the error function */
+  slot = next_slot(slot);
+  sc->error_code = slot;     /* the code that s7 thinks triggered the error */
+  slot = next_slot(slot);
+  sc->error_line = slot;     /* the line number of that code */
+  slot_set_value(slot, make_permanent_integer(0));
+  add_saved_pointer(sc, slot_value(slot));
+  slot = next_slot(slot);
+  sc->error_file = slot;     /* the file name of that code */
+  slot = next_slot(slot);
+  sc->error_position = slot; /* file-byte position of that code */
+  slot_set_value(slot, make_permanent_integer(0));
+  add_saved_pointer(sc, slot_value(slot));
 #if With_History
-  sc->error_history = add_slot_unchecked_with_id(sc, let, make_symbol(sc, "error-history", 13), sc->F); /* buffer of previous evaluations */
+  slot = next_slot(slot);
+  sc->error_history = slot;  /* buffer of previous evaluations */
 #endif
-  end_temp(sc->x);
+  let_set_outlet(let, sc->rootlet);
   return(let);
 }
 
@@ -56758,6 +56736,7 @@ static s7_pointer s_lookup_1(s7_scheme *sc, s7_pointer symbol, const char *func,
   return(lookup(sc, symbol));
 }
 
+#if 0
 static s7_pointer s1_lookup_1(s7_scheme *sc, s7_pointer symbol, const char *func, s7_pointer expr)
 {
   if ((curlet_has_slots(sc)) &&
@@ -56776,6 +56755,7 @@ static s7_pointer s1_lookup_1(s7_scheme *sc, s7_pointer symbol, const char *func
 }
 
 #define s1_lookup(Sc, Symbol, Expr) s1_lookup_1(Sc, Symbol, __func__, Expr)
+#endif
 
 static void check_t_1(s7_scheme *sc, s7_pointer let, const char *func, s7_pointer expr, s7_pointer var)
 {
@@ -61613,11 +61593,6 @@ static bool fx_tree_in(s7_scheme *sc, const s7_pointer tree, const s7_pointer va
 
 static void fx_tree(s7_scheme *sc, s7_pointer tree, s7_pointer var1, s7_pointer var2, s7_pointer var3, bool more_vars)
 {
-#if 0
-  if (is_pair(tree))
-    fprintf(stderr, "fx_tree %s %s %s %s %d\n", display(tree),
-	    (var1) ? display(var1) : "nil", (var2) ? display(var2) : "nil", (var3) ? display(var3) : "nil", more_vars);
-#endif
   if (!is_pair(tree)) return;
   if ((is_symbol(car(tree))) &&
       (is_definer_or_binder(car(tree))))
@@ -64915,6 +64890,8 @@ static bool d_7piiid_ok(s7_scheme *sc, opt_info *opc, const s7_pointer s_func, c
   return_false(sc, expr);
 }
 
+static bool float_optimize_1(s7_scheme *sc, s7_pointer form);
+
 static bool opt_float_vector_set(s7_scheme *sc, opt_info *opc, s7_pointer v, s7_pointer indexp1, s7_pointer indexp2, s7_pointer indexp3, s7_pointer valp)
 {
   const s7_pointer settee = s7_slot(sc, v);
@@ -65006,7 +64983,8 @@ static bool opt_float_vector_set(s7_scheme *sc, opt_info *opc, s7_pointer v, s7_
 		      return_true(sc, NULL);
 		    }
 		  q_func3_arg(opc).o1 = sc->opts[sc->pc];
-		  if (float_optimize(sc, valp))
+		  if /* (float_optimize(sc, valp)) */
+		    ((float_optimize_1(sc, valp)) && (sc->pc < Opts_Size))
 		    {
 		      q_call(opc).fd = opt_d_7piid_sssf;
 		      q_func3(opc).fd = q_func3_arg(opc).q_call(o1).fd;
@@ -67306,7 +67284,7 @@ static bool p_pip_ssf_combinable(s7_scheme *sc, opt_info *opc, int32_t start)
 	  q_func3(opc).p_pi_f = q_func(o1).p_pi_f;
 	  q_arg3(opc).p = q_arg1(o1).p;
 	  q_arg4(opc).p = q_arg2(o1).p;
-	  q_call(opc).fp = opt_p_pip_sso;
+	  q_call(opc).fp = opt_p_pip_sso; /* (set! (obj j) (sequence i)) and the like */
 	  backup_pc(sc);
 	  return_true(sc, NULL);
 	}}
@@ -70258,7 +70236,7 @@ static s7_pointer opt_do_very_simple(opt_info *o)
 	  }}
   else
     {
-      if (f == opt_p_pip_sso) /* is this code dead? does it belong above? */
+      if (f == opt_p_pip_sso) /* tref */
 	{ /* vector-set from vector-ref (i.e. copy), but treating vector-* as generic */
 	  if ((let_dox_slot1(do_curlet_unchecked(o)) == q_arg2(o1).p) && (q_arg2(o1).p == q_arg4(o1).p))
 	    {
@@ -70902,19 +70880,17 @@ static bool float_optimize_1(s7_scheme *sc, s7_pointer form)
 {
   const s7_pointer expr = car(form);
   s7_pointer head, s_func, s_slot = NULL;
-  s7_int len;
   if (Opt_Print) fprintf(stderr, "     float_optimize[%d] %s\n", __LINE__, display(form));
   if (With_Gmp) return(false);
 
   if (!is_pair(expr)) /* wrap constants/symbols */
     return_bool(sc, opt_float_not_pair(sc, expr), expr);
   head = car(expr);
-  len = s7_list_length(sc, expr);
   if (is_symbol(head))
     {
       if ((is_syntactic_symbol(head)) ||
 	  (is_syntactic_pair(expr)))
-	return_bool(sc, d_syntax_ok(sc, expr, len), expr);
+	return_bool(sc, d_syntax_ok(sc, expr, s7_list_length(sc, expr)), expr);
 
       s_slot = s7_slot(sc, head);
       if (!is_slot(s_slot)) return_false(sc, expr);
@@ -70927,7 +70903,10 @@ static bool float_optimize_1(s7_scheme *sc, s7_pointer form)
 
   if (is_c_function(s_func))
     {
+      s7_int len;
       opt_info *opc = alloc_opt_info(sc);
+      len = s7_list_length(sc, expr);
+
       switch (len)
 	{
 	case 1:
@@ -70974,7 +70953,7 @@ static bool float_optimize_1(s7_scheme *sc, s7_pointer form)
 	      return(float_optimize(sc, set_plist_1(sc, result)));
 	    }}
       if (!s_slot) return_false(sc, expr);
-      return_bool(sc, d_implicit_ok(sc, s_slot, expr, len), expr);
+      return_bool(sc, d_implicit_ok(sc, s_slot, expr, s7_list_length(sc, expr)), expr);
     }
   return_false(sc, expr);
 }
@@ -79633,7 +79612,8 @@ static void check_lambda_star(s7_scheme *sc)
 static inline bool is_undefined_feed_to(s7_scheme *sc, const s7_pointer sym)
 {
   return((sym == sc->feed_to_symbol) &&
-	 ((symbol_ctr(sc->feed_to_symbol) == 0) || (s7_symbol_value(sc, sc->feed_to_symbol) == sc->undefined)));
+	 ((symbol_ctr(sc->feed_to_symbol) == 0) || /* => has no associated value normally */
+	  (s7_symbol_value(sc, sc->feed_to_symbol) == sc->undefined)));
 }
 
 static bool is_all_fxable(s7_scheme *sc, s7_pointer exprs)
@@ -85478,13 +85458,13 @@ static bool do_is_safe(s7_scheme *sc, s7_pointer body, s7_pointer stepper, s7_po
 		    else
 		      {
 			const s7_pointer end_and_result = caddr(code); /* sc->code */
-			/* I think this is trying to catch (set! end i) [do-test-20 s7test] etc and needs the end-and-result form to check that */
-#if 1
+			/* this is trying to catch (set! end i) [do-test-20 s7test] etc and needs the end-and-result form to check that */
 			if ((is_pair(end_and_result)) &&
 			    (is_pair(car(end_and_result))) &&
 			    (!is_syntax(caar(end_and_result))))  /* 10-Jan-24 but why? */
 			  {
 			    bool result;
+			    /* fprintf(stderr, "%d: %s %s %s\n", __LINE__, display(end_and_result), display(settee), display(expr)); */
 			    set_match_symbol(settee);
 			    result = tree_match(car(end_and_result));  /* (set! end ...) in some fashion */
 			    clear_match_symbol(settee);
@@ -85494,7 +85474,6 @@ static bool do_is_safe(s7_scheme *sc, s7_pointer body, s7_pointer stepper, s7_po
 				  fprintf(stderr, "%s[%d]: %s in %s\n", __func__, __LINE__, display(settee), display_truncated(end_and_result));
 				do_return_false(expr);
 			      }}
-#endif
 			if (!direct_memq(settee, var_list)) /* is some local variable being set? */
 			  {
 			    const s7_pointer val = lookup_unexamined(sc, settee);
@@ -89601,13 +89580,11 @@ static bool op_thunk_c(s7_scheme *sc)
       sc->value = car(body);
       return(false);
     }
-#if 1
   if (caar(body) == sc->quote_function)      /* #_quote can't be refined */
     {
       sc->value = cadar(body);
       return(false);
     }
-#endif
   set_curlet(sc, inline_make_let(sc, closure_let(func)));
   sc->code = car(body);
   return(true); /* goto Eval */
@@ -95137,10 +95114,6 @@ static bool unknown_unknown(s7_scheme *sc, s7_pointer code, opcode_t op)
 
 static bool is_immutable_and_stable(s7_scheme *sc, s7_pointer func)
 {
-#if 0
-  if (symbol_ctr(func) != 1) /* protect against (define-constant (p) (define-constant (p) ...)) -- ??? */
-    return(false);
-#endif
   if ((is_defined_global(func)) && (is_immutable_slot(global_slot(func))))
     return(true);
   for (s7_pointer let = sc->curlet; let; let = let_outlet(let))
@@ -103155,7 +103128,50 @@ static void dumb_repl(s7_scheme *sc)
 
 void s7_repl(s7_scheme *sc)
 {
+#if !With_C_Loader
   dumb_repl(sc);
+#else
+#if With_Notcurses
+  s7_load(sc, "nrepl.scm");
+#else
+  /* try to get lib_s7.so from the repl's directory, and set *libc*.
+   *   otherwise repl.scm will try to load libc.scm which will try to build libc_s7.so locally, but that requires s7.h
+   */
+#if With_System_Extras
+  bool repl_loaded = false;
+#endif
+  const s7_pointer let = s7_inlet(sc, set_clist_2(sc, make_symbol(sc, "init_func", 9), make_symbol(sc, "libc_s7_init", 12)));
+  const s7_int gc_loc = gc_protect_1(sc, let);
+  const s7_pointer old_let = s7_set_curlet(sc, let);   /* let is now (curlet) so loaded names from libc will be placed there, not in (rootlet) */
+  const s7_pointer val = s7_load_with_environment(sc, "libc_s7.so", let);
+  if (val)
+    {
+      const s7_pointer libs = global_slot(sc->libraries_symbol);
+      const s7_uint hash = raw_string_hash((const uint8_t *)"*libc*", 6);  /* hack around an idiotic gcc 10.2.1 warning */
+      s7_define(sc, sc->rootlet, new_symbol(sc, "*libc*", 6, hash, hash % Symbol_Table_Size), let);
+      slot_set_value(libs, cons(sc, cons(sc, s7_make_semipermanent_string(sc, "libc.scm"), let), slot_value(libs)));
+    }
+  s7_set_curlet(sc, old_let);       /* restore incoming (curlet) */
+  s7_gc_unprotect_at(sc, gc_loc);
+
+#if !With_System_Extras
+  dumb_repl(sc);  /* repl.scm uses file-exists? et al */
+#else
+  if (!val) /* s7_load was unable to find/load libc_s7.so */
+    dumb_repl(sc);
+  else
+    {
+#if s7_Debugging
+      s7_autoload(sc, make_symbol(sc, "compare-calls", 13), s7_make_string(sc, "compare-calls.scm"));
+      s7_autoload(sc, make_symbol(sc, "get-overheads", 13), s7_make_string(sc, "compare-calls.scm"));
+#endif
+      s7_provide(sc, "libc.scm");
+      if (!repl_loaded) s7_load(sc, "repl.scm");
+      s7_eval_c_string(sc, "((*repl* 'run))");
+    }
+#endif /* s7_Debugging */
+#endif /* With_Notcurses */
+#endif /* With_C_Loader */
 }
 
 #if WITH_MAIN && (!USE_SND)
@@ -103247,33 +103263,33 @@ int main(int argc, char **argv)
  * ------------------------------------------------------
  * tpeak        148    114    105    109    109    109
  * tref        1081    687    459    412    405    405
- * tlimit      3936   5371   5371    783    778    780
+ * tlimit      3936   5371   5371    783    778    778
  * index              1016    967    988    992    994
- * tmock              1145   1042   1031   1032   1028
+ * tmock              1145   1042   1031   1032   1027
  * tvect       3408   2464   1669   1457   1483   1483
  * thook       7651   ----   2030   1731   1696   1581
  * tauto                     2048   1760   1792   1786
  * texit                     3094   3093   1830   1828
  * lt          2222   2172   2185   1892   1895   1892
- * s7test             1831   1829   1849   1914   1922
- * dup                3788   2239   2012   1994   2005
- * tread              2421   2408   2241   2255   2258  2253
+ * s7test             1831   1829   1849   1914   1919
+ * dup                3788   2239   2012   1994   2050
+ * tread              2421   2408   2241   2255   2256
  * tcopy              5546   2375   2352   2330   2308
  * trclo       8248   2782   2634   2499   2430   2439
  * fbench      2933   2583   2430   2536   2532   2522
- * tmat               3042   2578   2522   2626   2638
+ * tmat               3042   2578   2522   2626   2627
  * tload                     2404   2506   2699   2701
  * tsort       3683   3104   2804   2858   2850   2850
  * titer       4550   3349   2985   2917   2929   2858
  * tio                3752   3620   3127   3141   3145
  * tbit        3836   3305   3261   3181   3184   3186
- * teq                4045   3486   3556   3552   3452  3437
+ * teq                4045   3486   3556   3552   3434
  * tobj               3970   3577   3434   3459   3456
  * tmac               4373   4193   4024   3825   3723
  * tcomplex           3869   3844   4215   4194   4150
- * tmap               8774   4541   4380   4375   4370
- * tcase              4793   4430   4376   4385   4385
- * tlet        11.0   6974   5980   4470   4448   4449
+ * tmap               8774   4541   4380   4375   4367
+ * tcase              4793   4430   4376   4385   4380
+ * tlet        11.0   6974   5980   4470   4448   4447
  * tfft               7729   4476   4538   4550   4550
  * tshoot             5447   5055   4833   4768   4763
  * tstar              7121   5565   5237   5172   5175
@@ -103282,24 +103298,24 @@ int main(int argc, char **argv)
  * tlist       9219   7546   6240   5770   5770   5756
  * trec        19.6   6980   6656   6015   5864   5874
  * tari        14.3   12.5   6662   6292   6032   5912
- * tgc                6720   5995   6092   6082   6080
+ * tgc                6720   5995   6092   6082   6084
  * tgsl               7802   6282   6208   6218   6218
- * tleft       12.2   9753   7331   6393   6326   6263
- * tset                      6260   6278   6302   6278
+ * tleft       12.2   9753   7331   6393   6326   6265
+ * tset                      6260   6278   6302   6266
  * tmisc                     7614   7130   7007   7004
  * tlamb                     8003   7920   7925   7575
  * tclo               8025   8809   7627   7645   7580
- * tform                     9992   9626   9030   9015
+ * tform                     9992   9626   9030   9011
  * thash              11.7   9479   9283   9191   9164
- * cb          12.9   11.0   9564   9657   9551   9468
- * tmap-hash                        10.3   10.2   10.2  10.1
+ * cb          12.9   11.0   9564   9657   9551   9463
+ * tmap-hash                        10.3   10.2   10.1
  * tgen               11.4   12.1   12.4   12.7   12.8
  * tall        15.9   15.6   15.6   15.1   15.1   15.1
  * timp               24.4   19.6   15.5   15.3   15.3
  * tmv                21.9   20.7   16.6   17.9   17.9
  * calls              37.5   37.5   37.1   38.2   38.2
  * sg                        55.8   55.3   56.2   56.3
- * tbig              175.8  148.1  145.5  145.2  145.2
+ * tbig              175.8  148.1  145.5  145.2  145.1 [gc -145?]
  * ------------------------------------------------------
  *
  * (+ a (values b c) d) -> op_safe_c_a_m2a|m2c|m2s_a expanded directly, or safe_c_apa?
@@ -103310,13 +103326,7 @@ int main(int argc, char **argv)
  *         (V1 (make-vector (vector-dimensions V))))
  *    (equal? (vector-dimensions V) (vector-dimensions V1)))
  *  also (car (vector-dimensions..)) in tnum
- * empty let w/o defs/binds in body is like begin -- don't allocate (#<empty-let>?)
- * how is the var value posted? show-variables in t725
- * no method: apply[??] apply-values arity catch[??] cons dilambda[??] eq? eqv? error[??] eval for-each[??] hash-table
- *            inlet list list-values map[??] sublet throw[??] values varlet vector
- *    there's repeated code here (type-of/let? etc)
- * t903 -> s7test. let_equal combine bool arg
- * test evall'd func in error et al -- does not work, and may not make any sense.
+ * empty let w/o defs/binds in body is like begin -- don't allocate (#<empty-let>?) is this common?
  *
  * old, maybe someday:
  *   pcg random algorithm [64]

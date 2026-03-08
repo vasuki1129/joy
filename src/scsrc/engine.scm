@@ -1,3 +1,8 @@
+
+(define global-debug-flag 1)
+
+
+
 (define global-init (list))
 (define global-update (list))
 (define global-render (list))

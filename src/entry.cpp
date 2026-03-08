@@ -29,39 +29,8 @@ int main(int argc, char **argv) {
       scheme_init();
       s7_repl(get_scheme());
       return 0;
-      std::string buffer;
-      while (1) {
-
-        s7_scheme *s7 = get_scheme();
-
-        fprintf(stdout, "joy>>");
-
-        int openParen = 0;
-        int closeParen = 0;
-        while (1) {
-          char c;
-          c = getc(stdin);
-          if (c == '(') {
-            openParen++;
-          }
-          if (c == ')') {
-            closeParen++;
-          }
-          buffer += c;
-          if (openParen == closeParen) {
-            fflush(stdin);
-            break;
-          }
-        }
-
-        char response[1024];
-        snprintf(response, 1024, "%s", buffer.c_str());
-        buffer.clear();
-        s7_eval_c_string(s7, response);
-        fflush(stdin);
-      }
-      return 0;
     }
+
 
 
     renderer_init();
@@ -103,7 +72,16 @@ int main(int argc, char **argv) {
           {
             reload_current_module();
           }
+          else
+          {
+            scheme_pass_key_down( e.key.key );
+          }
         }
+
+
+
+
+
 
 
 

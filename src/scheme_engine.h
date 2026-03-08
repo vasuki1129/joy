@@ -1,4 +1,6 @@
 #pragma once
+#include <SDL3/SDL.h>
+
 
 #define __SCHEME_FUNC static s7_pointer
 #define SCHEME_FUNC(name) __SCHEME_FUNC name ( s7_scheme* sc, s7_pointer args )
@@ -15,6 +17,13 @@ void load_game_module(std::string path);
 void scheme_eval_proc(std::string function);
 
 void reload_current_module();
+
+void scheme_pass_key_down(SDL_Keycode code);
+
+
+
+
+
 
 SCHEME_FUNC(scm_print)
 {

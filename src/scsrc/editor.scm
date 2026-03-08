@@ -6,6 +6,23 @@
   )
 )
 
+(define editor-repl-buffer (list))
+
+
+(define (editor-key-down-hook keycode)
+  (if (> keycode 255)
+      ()
+      (set! editor-repl-buffer (append editor-repl-buffer (list (integer->char keycode))))
+  )
+)
+
+(add-key-down-hook editor-key-down-hook)
+
+
+
+
+
+
 (define (editor-render)
   (begin
     (cond
@@ -13,6 +30,9 @@
      (begin
        (set-color '(0.2 0.2 0.2 1.0))
        (fill-rect '(0.0 0.0 800.0 200.0))
+       (set-color '(1.0 1.0 1.0 1.0))
+       (render-string (list->string editor-repl-buffer) 0 0 16 16)
+
      ))
      (else
      ())
