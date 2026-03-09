@@ -1,4 +1,5 @@
 (define editor-shown 1)
+(define editor-loaded-scheme-file '())
 
 (define (editor-process)
   (begin
@@ -8,7 +9,6 @@
 
 (define editor-repl-buffer (list))
 
-
 (define (editor-key-down-hook keycode)
   (if (> keycode 255)
       ()
@@ -17,11 +17,6 @@
 )
 
 (add-key-down-hook editor-key-down-hook)
-
-
-
-
-
 
 (define (editor-render)
   (begin

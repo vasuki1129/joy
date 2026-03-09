@@ -20,11 +20,4 @@
 
 
 (define (nth val n)
-  (do
-    (
-     (x val (cdr x))
-     (ctr 0 (+ ctr 1))
-    )
-    ((= ctr n) (car x))
-  )
-)
+  (list-ref val n))

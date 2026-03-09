@@ -31,8 +31,6 @@ int main(int argc, char **argv) {
       return 0;
     }
 
-
-
     renderer_init();
     bool quit = false;
 
@@ -42,6 +40,8 @@ int main(int argc, char **argv) {
     double global_time = 0.0f;
 
     bool editor = false;
+
+    scheme_eval_proc("global-init-process");
     while (!quit) {
 
       last = SDL_GetTicks();
@@ -77,20 +77,11 @@ int main(int argc, char **argv) {
             scheme_pass_key_down( e.key.key );
           }
         }
-
-
-
-
-
-
-
-
       }
       renderer_clear();
 
       scheme_eval_proc("global-update-process");
       scheme_eval_proc("global-render-process");
-
 
       renderer_update();
       delta = SDL_GetTicks()-last;
