@@ -46,21 +46,19 @@ int main(int argc, char **argv) {
 
       last = SDL_GetTicks();
       global_time += delta;
-/*
+
       std::string expr = "";
       expr += "(set! global-delta ";
-      expr += delta;
+      expr += std::to_string(delta);
       expr += ")";
       s7_eval_c_string(get_scheme(),expr.c_str());
-
-
 
       expr = "";
       expr += "(set! global-time ";
-      expr += global_time;
+      expr += std::to_string(global_time);
       expr += ")";
       s7_eval_c_string(get_scheme(),expr.c_str());
-*/
+
       SDL_Event e;
       while (SDL_PollEvent(&e)) {
         if (e.type == SDL_EVENT_QUIT) {
@@ -84,7 +82,7 @@ int main(int argc, char **argv) {
       scheme_eval_proc("global-render-process");
 
       renderer_update();
-      delta = SDL_GetTicks()-last;
+      delta = (SDL_GetTicks()-last)/1000.0f;
     }
 /*
 */
