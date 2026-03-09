@@ -4,12 +4,27 @@
   (do
       (
        (p (string->list str) (cdr p))
+       (pos x (if (or (< c 32) (> c 127)) pos (+ pos xs)))
+       (d 0 (if (or (< c 32) (> c 127)) (render-character (car p) pos y xs ys)))
+       )
+      ((null? p) 0)
+  )
+)
+
+
+(define (render-string-literally str x y xs ys)
+  (do
+      (
+       (p (string->list str) (cdr p))
        (pos x (+ pos xs))
        (d 0 (render-character (car p) pos y xs ys))
        )
       ((null? p) 0)
-    )
   )
+)
+
+
+
 
 (define (render-string-wrapped str x y xs ys line-length)
   (do
@@ -23,4 +38,16 @@
        (null? p) ()
       )
     )
+)
+
+(define (render-string-formatted str x y xs ys)
+  (do
+      (
+       (p (string->list str) (cdr p))
+       (posx x (if (or (< (char->integer (car p)) 32) (> (char->integer (car p)) 127)) 0 (+ posx xs)))
+       (posy y (if (char=? (car p) #\newline) (+ posy ys) posy))
+       (d 0 (if (not (or (< (char->integer (car p)) 32) (> (char->integer (car p)) 127))) (render-character (car p) posx posy xs ys)))
+      )
+      ((null? p) 0)
+  )
 )

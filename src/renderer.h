@@ -81,8 +81,6 @@ void render_character(uint8_t c, float x, float y, float xs, float xy);
 
 SCHEME_FUNC(scm_render_character)
 {
-
-
   uint8_t c;
   if(s7_is_character(s7_car(args)))
   {
