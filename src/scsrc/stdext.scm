@@ -9,13 +9,7 @@
 
 (define (first val) (car val))
 (define (last val)
-  (do
-    (
-     (x val (cdr x))
-     (out () (car x))
-    )
-    ((null? x) out)
-  )
+  (list-ref val (- (length val) 1))
 )
 
 

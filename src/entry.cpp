@@ -1,3 +1,6 @@
+#define WITH_HTTP
+
+
 #include <SDL3/SDL_events.h>
 #include <SDL3/SDL_render.h>
 #include <SDL3/SDL_timer.h>

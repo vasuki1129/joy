@@ -18,6 +18,14 @@
 
 (add-key-down-hook editor-key-down-hook)
 
+
+
+
+(define get-text (curl-get-sync "http://google.com"))
+
+
+
+
 (define (editor-render)
   (begin
     (cond
@@ -26,8 +34,7 @@
        (set-color '(0.2 0.2 0.2 1.0))
        (fill-rect '(0.0 0.0 800.0 200.0))
        (set-color '(1.0 1.0 1.0 1.0))
-       (render-string (list->string editor-repl-buffer) 0 0 16 16)
-       (render-string (number->string global-time) 0 16 16 16)
+       (render-string-wrapped get-text 0 0 16 16 40)
      ))
      (else
      ())

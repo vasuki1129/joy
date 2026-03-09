@@ -2,6 +2,7 @@
 #include <SDL3/SDL.h>
 
 
+#define SCHEME_NIL s7_nil(sc)
 #define __SCHEME_FUNC static s7_pointer
 #define SCHEME_FUNC(name) __SCHEME_FUNC name ( s7_scheme* sc, s7_pointer args )
 #define SCHEME_REGISTER(func, name, desc, arity) s7_define_function(s7, name, func, arity, 0, false, desc);

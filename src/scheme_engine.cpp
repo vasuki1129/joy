@@ -2,7 +2,7 @@
 #include "renderer.h"
 #include "s7.h"
 #include <SDL3/SDL_keycode.h>
-
+#include "http.h"
 s7_scheme *s7 = nullptr;
 std::string current_module_path = "";
 
@@ -64,6 +64,14 @@ void register_scheme_functions() {
     s7_define_function(s7, "draw-line", scm_draw_line, 2, 0, false, "SDL_SetRenderLine");
 
     SCHEME_REGISTER(scm_render_character,"render-character","renders a given character",5);
+
+#ifdef WITH_HTTP
+    initialize_curl();
+    SCHEME_REGISTER(scm_curl_get_sync, "curl-get-sync","Makes a simple get request and blocks until it responds", 1);
+#endif
+
+
+
 }
 
 void reload_current_module()
