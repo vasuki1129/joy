@@ -1,0 +1,29 @@
+#+title: joy documentation
+#+OPTIONS: \n:t
+#+OPTIONS: num:nil
+**function reference**
+* s7 scheme
+* joy extensions
+** */std/*
+a set of extensions to the Scheme library for basic functions and convenience mnemotic aliasing to aid learning.
+*** println
+~(println x)~
+~x : string~
+prints the string contained in x to the console.
+*** str
+~(str obj)~
+~obj : object~
+convenience alias for ~(object->string obj)~.
+*** first
+~(first val)~
+~val : list~
+mnemotic alias for ~(car val)~.
+*** last
+~(last val)~
+~val : list~
+returns the last element of a list passed to it
+*** nth
+~(nth val n)~
+~val : list~
+~n : integer~
+returns the nth element of a list. alias for ~(list-ref val n)~.

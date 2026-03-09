@@ -1,0 +1,9 @@
+#+title: Notes
+
+* Requirements
++ Batteries Included :: Everything you need to make something cool should be included, no linking libraries to do common stuff, or needing to find tools, everything from a text editor to a sprite editor should be included
++ 2D Only (for now) :: Functional 3D is kinda messy, and time consuming, thats not what joy is about, its about getting something cool going /fast/
++ Hot Reloadable :: You *should* never have to restart the engine when you make a change, and reloads should be as close to instant as possible
++ Effortlessly Extensible :: As much as possible is written in Scheme, meaning that core features all the way down can be overridden or modified trivially
+* Features
+sfjjkasc

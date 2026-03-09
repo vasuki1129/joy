@@ -23,9 +23,6 @@
   )
 )
 
-
-
-
 (define (render-string-wrapped str x y xs ys line-length)
   (do
       (

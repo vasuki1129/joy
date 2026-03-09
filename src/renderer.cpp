@@ -1,6 +1,7 @@
 #include "renderer.h"
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_render.h>
+#include <SDL3/SDL_surface.h>
 #include <SDL3/SDL_video.h>
 #include <SDL3_image/SDL_image.h>
 
@@ -28,8 +29,8 @@ void render_character(uint8_t c, float x, float y, float xs, float xy)
 void renderer_init() {
     SDL_Init(SDL_INIT_VIDEO);
     SDL_CreateWindowAndRenderer("joy", 800, 600, SDL_WINDOW_RESIZABLE, &window, &renderer);
-    fallbackBitmap = IMG_LoadTexture(renderer, "curses_square_16x16.png");
-
+    fallbackBitmap = IMG_LoadTexture(renderer, "assets/curses_square_16x16.png");
+    SDL_SetTextureScaleMode(fallbackBitmap, SDL_SCALEMODE_PIXELART);
 }
 
 void renderer_clear()
