@@ -1,2 +1,2 @@
 all:
-	g++ -o joy src/*.c src/*.cpp -lSDL3 -lSDL3_image -lcurl -DWITH_HTTP
+	g++ -o joy src/engine/*.c src/engine/*.cpp -lSDL3 -lSDL3_image -lcurl -DWITH_HTTP
