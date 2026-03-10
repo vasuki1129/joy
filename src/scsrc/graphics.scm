@@ -47,4 +47,16 @@
       )
       ((null? p) 0)
   )
+  )
+
+(define (render-frame x y xs ys bw color-border color-background)
+  (begin
+    (set-color color-background)
+    (fill-rect (list x y xs ys))
+    (set-color color-border)
+    (fill-rect (list x y xs bw))
+    (fill-rect (list x y bw ys))
+    (fill-rect (list (- xs bw) y bw ys))
+    (fill-rect (list x (- ys bw) xs bw))
+  )
 )

@@ -30,8 +30,16 @@
 (define global-time 0.0)
 (define global-delta 0.0)
 
+(define global-window-x 0.0)
+(define global-window-y 0.0)
+
+(define (set-window-size x y)
+  (begin
+    (set! global-window-x x)
+    (set! global-window-y y)
+    )
+)
+
 (define (global-init-process) (for-each (lambda (func) (func)) global-init))
 (define (global-update-process)  (for-each (lambda (func) (func)) global-update))
 (define (global-render-process)  (for-each (lambda (func) (func)) global-render))
-
-(print global-render)

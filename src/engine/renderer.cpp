@@ -1,10 +1,12 @@
 #include "renderer.h"
+#include "s7.h"
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_render.h>
 #include <SDL3/SDL_surface.h>
 #include <SDL3/SDL_video.h>
 #include <SDL3_image/SDL_image.h>
 
+#include <string>
 
 SDL_Window *window;
 SDL_Renderer *renderer;
@@ -41,6 +43,17 @@ void renderer_clear()
 
 void renderer_update()
 {
+    int wx, wy;
+    SDL_GetWindowSize(window, &wx, &wy);
+    std::string call_data = "(set-window-size ";
+    call_data += std::to_string(wx);
+
+    call_data += " ";
+    call_data+= std::to_string(wx);
+    call_data += ")";
+
+    s7_eval_c_string(get_scheme(), call_data.c_str());
+
     SDL_RenderPresent(renderer);
 }
 

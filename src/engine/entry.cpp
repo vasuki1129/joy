@@ -14,11 +14,20 @@
 
 #include <fstream>
 #include <iostream>
+#include <iomanip> // Required for std::setprecision, std::fixed
+#include <sstream> // Required for std::ostringstream
 
 
 
 
 
+
+
+std::string floatToStringWithPrecision(double value, int precision) {
+    std::ostringstream oss;
+    oss << std::fixed << std::setprecision(precision) << value;
+    return oss.str();
+}
 float timer = 0.0f;
 
 int main(int argc, char **argv) {
@@ -55,18 +64,22 @@ int main(int argc, char **argv) {
 
       std::string expr = "";
       expr += "(set! global-delta ";
-      expr += std::to_string(delta);
+      expr += floatToStringWithPrecision(delta,8);
       expr += ")";
       s7_eval_c_string(get_scheme(),expr.c_str());
 
       expr = "";
       expr += "(set! global-time ";
-      expr += std::to_string(global_time);
+      expr += floatToStringWithPrecision(global_time, 8);
       expr += ")";
       s7_eval_c_string(get_scheme(),expr.c_str());
 
       SDL_Event e;
       while (SDL_PollEvent(&e)) {
+
+
+
+
         if (e.type == SDL_EVENT_QUIT) {
             quit = true;
         }
@@ -88,7 +101,16 @@ int main(int argc, char **argv) {
       scheme_eval_proc("global-render-process");
 
       renderer_update();
-      delta = (SDL_GetTicks()-last)/1000.0f;
+      long frame_time = SDL_GetTicks()-last;
+      if (frame_time < (long)((1.0 / 160.0) * 1000.0)) {
+          SDL_Delay((long)((1.0/160.0)*1000.0)-frame_time);
+
+      }
+
+
+      long final_time = SDL_GetTicks()-last;
+      delta = (final_time / 1000.0);
+
     }
 /*
 */

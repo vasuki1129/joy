@@ -24,9 +24,9 @@
      ((= editor-shown 1)
      (begin
        (set-color '(0.2 0.2 0.2 1.0))
-       (fill-rect '(0.0 0.0 800.0 200.0))
+       (render-frame 0.0 0.0 global-window-x 200.0 4 '(0.4 0.4 0.4 1.0) '(0.2 0.2 0.2 1.0))
        (set-color '(1.0 1.0 1.0 1.0))
-       (render-string-formatted "joy -- 0.0.1" 0 0 12 12)
+       (render-string-formatted (object->string (/ 1 global-delta)) 0 0 12 12)
      ))
      (else
      ())
