@@ -1,6 +1,12 @@
 #pragma once
 #include <SDL3/SDL.h>
 
+#define car s7_car
+#define cdr s7_cdr
+
+
+
+
 
 #define SCHEME_NIL s7_nil(sc)
 #define __SCHEME_FUNC static s7_pointer
@@ -21,6 +27,7 @@ void reload_current_module();
 
 void scheme_pass_key_down(SDL_Keycode code);
 
+void scheme_pass_key_up(SDL_Keycode code);
 
 
 

@@ -5,13 +5,25 @@
 #include <SDL3/SDL_surface.h>
 #include <SDL3/SDL_video.h>
 #include <SDL3_image/SDL_image.h>
-
 #include <string>
 
 SDL_Window *window;
 SDL_Renderer *renderer;
 SDL_Texture* fallbackBitmap;
+TTF_Font* terminess_nerd_default = nullptr;
 
+
+std::vector<SDL_Texture*> deferredDestroyTextures;
+
+
+void defer_destroy_texture(SDL_Texture* texture)
+{
+    deferredDestroyTextures.push_back(texture);
+}
+TTF_Font* get_ttf_font()
+{
+    return terminess_nerd_default;
+}
 
 SDL_Texture* getFallbackFont(){return fallbackBitmap;}
 //SDL_Window *GetWindow() { return window; }
@@ -32,7 +44,15 @@ void renderer_init() {
     SDL_Init(SDL_INIT_VIDEO);
     SDL_CreateWindowAndRenderer("joy", 800, 600, SDL_WINDOW_RESIZABLE, &window, &renderer);
     fallbackBitmap = IMG_LoadTexture(renderer, "assets/curses_square_16x16.png");
-    SDL_SetTextureScaleMode(fallbackBitmap, SDL_SCALEMODE_PIXELART);
+    SDL_SetTextureScaleMode(fallbackBitmap, SDL_SCALEMODE_NEAREST);
+    TTF_Init();
+    terminess_nerd_default = TTF_OpenFont("assets/terminess.ttf", 14);
+    if( terminess_nerd_default == NULL )
+    {
+
+        printf( "Failed to load font!  %s\n", SDL_GetError());
+
+    }
 }
 
 void renderer_clear()
@@ -55,5 +75,9 @@ void renderer_update()
     s7_eval_c_string(get_scheme(), call_data.c_str());
 
     SDL_RenderPresent(renderer);
+    for(SDL_Texture* t : deferredDestroyTextures)
+    {
+        SDL_DestroyTexture(t);
+    }
 }
 

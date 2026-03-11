@@ -7,6 +7,14 @@ s7_scheme *s7 = nullptr;
 std::string current_module_path = "";
 
 
+void scheme_pass_key_up(SDL_Keycode code)
+{
+  s7_call(get_scheme(),
+          s7_name_to_value(get_scheme(),"process-key-up"),
+          s7_make_list(s7,1,s7_make_integer(get_scheme(),(s7_int)code))
+          );
+}
+
 void scheme_pass_key_down(SDL_Keycode code)
 {
   s7_call(get_scheme(),
@@ -64,6 +72,11 @@ void register_scheme_functions() {
     s7_define_function(s7, "draw-line", scm_draw_line, 2, 0, false, "SDL_SetRenderLine");
 
     SCHEME_REGISTER(scm_render_character,"render-character","renders a given character",5);
+    SCHEME_REGISTER(scm_render_string_ttf,"render-string-ttf", "renders a pretty string",5);
+
+
+
+
 
 #ifdef WITH_HTTP
     initialize_curl();

@@ -1,18 +1,7 @@
-(display (load "stdext.scm"))
-(newline)
-(display (load "engine.scm"))
-
-(newline)
-(display (load "input.scm"))
-
-(newline)
-(display (load "coordinates.scm"))
-
-(newline)
-(display (load "graphics.scm"))
-
-(newline)
-(display (load "editor.scm"))
-
-(newline)
+(load "stdext.scm")
+(load "engine.scm")
+(load "input.scm")
+(load "coordinates.scm")
+(load "graphics.scm")
+(load "editor.scm")
 (println "Loaded standard library!")

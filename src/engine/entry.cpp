@@ -94,6 +94,10 @@ int main(int argc, char **argv) {
             scheme_pass_key_down( e.key.key );
           }
         }
+        else if(e.type == SDL_EVENT_KEY_UP)
+        {
+          scheme_pass_key_up(e.key.key);
+        }
       }
       renderer_clear();
 

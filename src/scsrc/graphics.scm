@@ -57,6 +57,6 @@
     (fill-rect (list x y xs bw))
     (fill-rect (list x y bw ys))
     (fill-rect (list (- xs bw) y bw ys))
-    (fill-rect (list x (- ys bw) xs bw))
+    (fill-rect (list x (- (+ y ys) bw) xs bw))
   )
 )

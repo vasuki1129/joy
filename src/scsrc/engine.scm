@@ -5,24 +5,18 @@
 
 (define (add-global-render-hook hook)
   (begin
-    (display "adding hook")
-    (newline)
     (set! global-render (cons hook global-render))
   )
 )
 
 (define (add-global-update-hook hook)
   (begin
-    (display "adding update hook")
-    (newline)
     (set! global-update (cons hook global-update))
   )
 )
 
 (define (add-global-init-hook hook)
   (begin
-    (display "adding init hook")
-    (newline)
     (set! global-init (cons hook global-init))
   )
 )
