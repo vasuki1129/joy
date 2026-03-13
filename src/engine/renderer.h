@@ -26,41 +26,53 @@ void defer_destroy_texture(SDL_Texture* texture);
 // string -> x -> y -> size -> color
 SCHEME_FUNC(scm_render_string_ttf)
 {
-  const char* str = s7_string(s7_list_ref(get_scheme(),args, 0));
+  const char *str = s7_string(s7_list_ref(get_scheme(), args, 0));
 
-  int x = s7_integer(s7_list_ref(get_scheme(),args, 1));
-  int y = s7_integer(s7_list_ref(get_scheme(),args, 2));
-  int size = s7_integer(s7_list_ref(get_scheme(),args, 3));
+  int x = s7_integer(s7_list_ref(get_scheme(), args, 1));
+  int y = s7_integer(s7_list_ref(get_scheme(), args, 2));
+  int size = s7_integer(s7_list_ref(get_scheme(), args, 3));
   s7_pointer color = s7_list_ref(get_scheme(), args, 4);
   float r = s7_real(s7_list_ref(get_scheme(), color, 0));
   float g = s7_real(s7_list_ref(get_scheme(), color, 1));
   float b = s7_real(s7_list_ref(get_scheme(), color, 2));
   float a = s7_real(s7_list_ref(get_scheme(), color, 3));
-  SDL_Color col{255,255,255,255};
-  SDL_Surface* textSurface = TTF_RenderText_Solid(get_ttf_font(), str,strlen(str),col);
-  if( textSurface == NULL )
-  {
-     return SCHEME_NIL;
-  }
-  SDL_Texture* textTexture = SDL_CreateTextureFromSurface(get_renderer(), textSurface);
-  if( textTexture == NULL )
-  {
+
+
+
+  char* c = strdup(str);
+  const char *string = strtok(c, "\n");
+  int n_lines = 0;
+  while (string != NULL) {
+
+    SDL_Color col{255, 255, 255, 255};
+    SDL_Surface *textSurface =
+        TTF_RenderText_Solid(get_ttf_font(), string, strlen(string), col);
+    if (textSurface == NULL) {
+      free(c);
+      return SCHEME_NIL;
+    }
+    SDL_Texture *textTexture =
+        SDL_CreateTextureFromSurface(get_renderer(), textSurface);
+    if (textTexture == NULL) {
+      SDL_DestroySurface(textSurface);
+      free(c);
+      return SCHEME_NIL;
+    }
+    int mWidth = textSurface->w;
+    int mHeight = textSurface->h;
     SDL_DestroySurface(textSurface);
-    return SCHEME_NIL;
+    SDL_FRect src{0, 0, (float)mWidth, (float)mHeight};
+    SDL_FRect dst{(float)x, (float)y+n_lines*14.0f, (float)mWidth, (float)mHeight};
+    SDL_SetTextureColorModFloat(textTexture, r, g, b);
+    SDL_SetTextureScaleMode(textTexture, SDL_SCALEMODE_LINEAR);
+    SDL_RenderTexture(get_renderer(), textTexture, &src, &dst);
+    defer_destroy_texture(textTexture);
+    string = strtok(NULL,"\n");
+    n_lines++;
   }
-  int mWidth = textSurface->w;
-  int mHeight = textSurface->h;
-  SDL_DestroySurface(textSurface);
-  SDL_FRect src{0,0,(float)mWidth,(float)mHeight};
-  SDL_FRect dst{(float)x,(float)y,(float)mWidth,(float)mHeight};
-  SDL_SetTextureColorModFloat(textTexture, r, g, b);
-  SDL_SetTextureScaleMode(textTexture, SDL_SCALEMODE_LINEAR);
-  SDL_RenderTexture(get_renderer(),textTexture,&src,&dst);
+  free(c);
   return SCHEME_NIL;
-  defer_destroy_texture(textTexture);
 }
-
-
 
 static s7_pointer scm_imgui_end(s7_scheme *sc, s7_pointer args) {
   ImGui::End();

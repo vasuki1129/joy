@@ -26,6 +26,11 @@
     (set! editor-repl-cursor-x (+ 1 editor-repl-cursor-x))
    )
    (
+    (and (= keycode 39) input-modifier-shift)
+    (set! editor-repl-buffer (append editor-repl-buffer "\""))
+    (set! editor-repl-cursor-x (+ 1 editor-repl-cursor-x))
+   )
+   (
     (and (= keycode 49) input-modifier-shift)
     (set! editor-repl-buffer (append editor-repl-buffer "!"))
 
@@ -60,9 +65,10 @@
    ((= keycode 13)
         (if input-modifier-shift
         (begin
-
           (set! editor-repl-cursor-x 0)
           (let ((editor-fetch-buffer editor-repl-buffer))
+            (set! editor-repl-cursor-x 0)
+            (set! editor-repl-cursor-y 0)
             (set! editor-repl-result (append editor-repl-buffer " -> " "Syntax Error") )
             (set! editor-repl-buffer "")
             (set! editor-repl-result (append editor-fetch-buffer " -> " (str (eval-string editor-fetch-buffer (rootlet)))))
@@ -71,7 +77,9 @@
 
         (begin
           (set! editor-repl-cursor-y (+ 1 editor-repl-cursor-y))
-
+          (set! editor-repl-cursor-x 0)
+          (set! editor-repl-buffer
+                (list->string (append (string->list editor-repl-buffer) (string->list "\n"))))
           )
         )
 
@@ -94,8 +102,6 @@
 
 (add-key-down-hook editor-key-down-hook)
 
-
-
 (define (editor-render)
   (begin
     (cond
@@ -112,7 +118,7 @@
        (set-color '(0.0 1.0 1.0 1.0))
        (render-string-ttf editor-repl-buffer 6 6 16 '(0.87 1.0 0.92 1.0))
        (render-string-ttf editor-repl-result 6 204 16 '(0.9 1.0 0.93 1.0))
-       (if (= (modulo (floor global-time) 2) 0) (render-string-ttf "|" (+ 5 (* editor-repl-cursor-x 8)) 6 16 '(1.0 1.0 1.0 1.0)))
+       (if (= (modulo (floor global-time) 2) 0) (render-string-ttf "|" (+ 5 (* editor-repl-cursor-x 8)) (+ 5 (* editor-repl-cursor-y 14)) 16 '(1.0 1.0 1.0 1.0)))
        )
       )
       )
