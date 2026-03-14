@@ -4,8 +4,8 @@
 
 
 
-(define editor-repl-enabled 0)
-
+(define editor-repl-enabled 1)
+(define editor-repl-mode #t)
 
 (define editor-theme-repl-border-color '(list 0.04 0.14 0.04 1.0))
 (define editor-theme-repl-background-color '(list 0.1 0.14 0.1 1.0))
@@ -23,6 +23,86 @@
    (
     (and (= keycode 48) input-modifier-shift)
     (set! editor-repl-buffer (append editor-repl-buffer ")"))
+    (set! editor-repl-cursor-x (+ 1 editor-repl-cursor-x))
+   )
+   (
+    (and (= keycode 91) input-modifier-shift)
+    (set! editor-repl-buffer (append editor-repl-buffer "{"))
+    (set! editor-repl-cursor-x (+ 1 editor-repl-cursor-x))
+   )
+   (
+    (and (= keycode 93) input-modifier-shift)
+    (set! editor-repl-buffer (append editor-repl-buffer "}"))
+    (set! editor-repl-cursor-x (+ 1 editor-repl-cursor-x))
+   )
+   (
+    (and (= keycode 50) input-modifier-shift)
+    (set! editor-repl-buffer (append editor-repl-buffer "@"))
+    (set! editor-repl-cursor-x (+ 1 editor-repl-cursor-x))
+   )
+   (
+    (and (= keycode 51) input-modifier-shift)
+    (set! editor-repl-buffer (append editor-repl-buffer "#"))
+    (set! editor-repl-cursor-x (+ 1 editor-repl-cursor-x))
+   )
+   (
+    (and (= keycode 52) input-modifier-shift)
+    (set! editor-repl-buffer (append editor-repl-buffer "$"))
+    (set! editor-repl-cursor-x (+ 1 editor-repl-cursor-x))
+   )
+
+   (
+    (and (= keycode 53) input-modifier-shift)
+    (set! editor-repl-buffer (append editor-repl-buffer "%"))
+    (set! editor-repl-cursor-x (+ 1 editor-repl-cursor-x))
+   )
+
+   (
+    (and (= keycode 54) input-modifier-shift)
+    (set! editor-repl-buffer (append editor-repl-buffer "^"))
+    (set! editor-repl-cursor-x (+ 1 editor-repl-cursor-x))
+   )
+
+   (
+    (and (= keycode 55) input-modifier-shift)
+    (set! editor-repl-buffer (append editor-repl-buffer "&"))
+    (set! editor-repl-cursor-x (+ 1 editor-repl-cursor-x))
+   )
+
+   (
+    (and (= keycode 56) input-modifier-shift)
+    (set! editor-repl-buffer (append editor-repl-buffer "*"))
+    (set! editor-repl-cursor-x (+ 1 editor-repl-cursor-x))
+   )
+
+   (
+    (and (= keycode 45) input-modifier-shift)
+    (set! editor-repl-buffer (append editor-repl-buffer "_"))
+    (set! editor-repl-cursor-x (+ 1 editor-repl-cursor-x))
+   )
+   (
+    (and (= keycode 61) input-modifier-shift)
+    (set! editor-repl-buffer (append editor-repl-buffer "+"))
+    (set! editor-repl-cursor-x (+ 1 editor-repl-cursor-x))
+   )
+   (
+    (and (= keycode 59) input-modifier-shift)
+    (set! editor-repl-buffer (append editor-repl-buffer ":"))
+    (set! editor-repl-cursor-x (+ 1 editor-repl-cursor-x))
+   )
+   (
+    (and (= keycode 44) input-modifier-shift)
+    (set! editor-repl-buffer (append editor-repl-buffer "<"))
+    (set! editor-repl-cursor-x (+ 1 editor-repl-cursor-x))
+   )
+   (
+    (and (= keycode 46) input-modifier-shift)
+    (set! editor-repl-buffer (append editor-repl-buffer ">"))
+    (set! editor-repl-cursor-x (+ 1 editor-repl-cursor-x))
+   )
+   (
+    (and (= keycode 47) input-modifier-shift)
+    (set! editor-repl-buffer (append editor-repl-buffer "?"))
     (set! editor-repl-cursor-x (+ 1 editor-repl-cursor-x))
    )
    (
@@ -51,7 +131,7 @@
     ()
     )
 
-   ( (> keycode 255)
+   ( (> keycode 126)
     ()
    )
    ((= keycode 9)
@@ -70,7 +150,7 @@
             (set! editor-repl-cursor-x 0)
             (set! editor-repl-cursor-y 0)
             (set! editor-repl-result (append editor-repl-buffer " -> " "Syntax Error") )
-            (set! editor-repl-buffer "")
+            (if editor-repl-mode (set! editor-repl-buffer ""))
             (set! editor-repl-result (append editor-fetch-buffer " -> " (str (eval-string editor-fetch-buffer (rootlet)))))
           )
         )
@@ -92,9 +172,11 @@
     (set! editor-repl-cursor-x (if (= editor-repl-cursor-x 0) 0 (- editor-repl-cursor-x 1)))
    )
    (else
-    (begin
-      (set! editor-repl-buffer (append editor-repl-buffer (string (integer->char keycode))))
-      (set! editor-repl-cursor-x (+ 1 editor-repl-cursor-x))
+    (if (> keycode 31)
+      (begin
+        (set! editor-repl-buffer (append editor-repl-buffer (string (integer->char keycode))))
+        (set! editor-repl-cursor-x (+ 1 editor-repl-cursor-x))
+      )
     )
    )
   )
