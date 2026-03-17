@@ -1,9 +1,3 @@
-
-
-
-
-
-
 (define editor-repl-enabled 1)
 (define editor-repl-mode #t)
 
@@ -16,9 +10,7 @@
 (define editor-repl-cursor-x 0)
 (define editor-repl-cursor-y 0)
 
-
 (define (editor-key-down-hook keycode)
-
   (cond
    (
     (and (= keycode 48) input-modifier-shift)
@@ -154,7 +146,6 @@
             (set! editor-repl-result (append editor-fetch-buffer " -> " (str (eval-string editor-fetch-buffer (rootlet)))))
           )
         )
-
         (begin
           (set! editor-repl-cursor-y (+ 1 editor-repl-cursor-y))
           (set! editor-repl-cursor-x 0)
@@ -162,10 +153,7 @@
                 (list->string (append (string->list editor-repl-buffer) (string->list "\n"))))
           )
         )
-
-
    )
-
 
    ((= keycode 8)
     (set! editor-repl-buffer (string-backspace editor-repl-buffer))
